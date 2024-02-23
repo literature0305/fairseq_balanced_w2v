@@ -67,40 +67,29 @@ class Wav2vecCriterion(FairseqCriterion):
 
         if self.code_book_balance=="class_reweight":
             hard_x_dist = hard_x.sum(0) + 1e-2 # 2,320
-            hard_x_avg = hard_x_dist.mean(-1) # 2
 
-            # give bigger loss for minor classes: Inverse of Number of Samples (INS)
-            # class_weight = (1/hard_x_dist * hard_x_avg.unsqueeze(1)) # 2,320
+            temperature = 0.5
+            class_weight = 1 / torch.pow(hard_x_dist, temperature) # 2,320
 
-            # give bigger loss for minor classes: Inverse of Square Root of Number of Samples (ISNS)
-            class_weight = (1/torch.sqrt(hard_x_dist) * torch.sqrt(hard_x_avg).unsqueeze(1)) # 2,320
-            
-            # get average weight of groups (it works)
+            # get the average weight of groups
             sample_weight = 0
             for i in range(hard_x.size(1)):
-                sample_weight = sample_weight + torch.matmul(hard_x[:,i], class_weight[i]) # B, 2
+                sample_weight = sample_weight + torch.matmul(hard_x[:,i], class_weight[i]) # B,320 X 320 = B
             sample_weight = sample_weight / hard_x.size(1)
 
             # check
             if torch.randperm(1000)[0] == 0:
                 print('hard_x distribution:', hard_x_dist) # 2,320
-                print('hard_x mean:', hard_x_avg) # 2
                 print('class_weight:', class_weight)
                 print('hard_x[:10]:', torch.argmax(hard_x, dim=-1)[:10])
                 print('sample_weight[:10]:', sample_weight[:10])
+                print('sample_weight.min():', sample_weight.min())
+                print('sample_weight.max():', sample_weight.max())
+                print('sample_weight.mean():', sample_weight.mean())
+                print('temperature:', temperature)
+                print('self.training:', self.training)
         elif self.code_book_balance=="focal":
-            hard_x_dist = hard_x.sum(0) + 1e-2 # 2,320
-            avg_probs = avg_probs.to(hard_x.dtype) + 1e-2 # 2,320
-            hard_x_avg = avg_probs.mean(-1) # 2
-
-            # give bigger loss for minor classes: Inverse of Square Root of Number of Samples (ISNS)
-            class_weight = (1/torch.sqrt(avg_probs) * torch.sqrt(hard_x_avg).unsqueeze(1)) # 2,320
-            
-            # get average weight of groups
-            sample_weight = 0
-            for i in range(hard_x.size(1)):
-                sample_weight = sample_weight + torch.matmul(hard_x[:,i], class_weight[i]) # B, 2
-            sample_weight = sample_weight / hard_x.size(1)
+            raise ValueError('Not work')
 
             # check
             if torch.randperm(1000)[0] == 0:
