@@ -32,7 +32,7 @@ criterion:
   _name: wav2vec
   infonce: true
   log_keys: ["prob_perplexity","code_perplexity","temp"]
-  loss_weights: [0.1, 0]
+  loss_weights: [0.1, 10]
   code_book_balance: "focal"
 
 optimization:
