@@ -99,6 +99,45 @@ class Wav2vecCriterion(FairseqCriterion):
                 print('class_weight:', class_weight)
                 print('hard_x[:10]:', torch.argmax(hard_x, dim=-1)[:10])
                 print('sample_weight[:10]:', sample_weight[:10])
+        elif self.code_book_balance=="sample_reweight3_accum":
+            hard_x_dist = hard_x.sum(0) + 1e-2 # 2,320
+
+            if self.hard_x_dist_accum is None:
+                self.hard_x_dist_accum = hard_x_dist
+            else:
+                interpolation_factor = 0.1
+                self.hard_x_dist_accum = self.hard_x_dist_accum * (1-interpolation_factor) + hard_x_dist * interpolation_factor
+
+            temperature = 0.1
+            # Ver 1.0
+            class_weight = 1 / torch.pow(self.hard_x_dist_accum, temperature) # 2,320
+            # Ver 2.0
+            # hard_x_avg = hard_x_dist.mean(-1) # 2
+            # class_weight = (1/torch.sqrt(hard_x_dist) * torch.sqrt(hard_x_avg).unsqueeze(1)) # 2,320
+
+            # get average weight of groups (it works)
+            sample_weight = 0
+            for i in range(hard_x.size(1)):
+                sample_weight = sample_weight + torch.matmul(hard_x[:,i], class_weight[i]) # B,320 X 320 = B
+            sample_weight = sample_weight / hard_x.size(1)
+
+            # final rescaling (it is not work)
+            rescale_factor = 1 # hard_x.size(0) / sample_weight.sum()
+            sample_weight = rescale_factor * sample_weight
+
+            # check
+            if torch.randperm(1000)[0] == 0:
+                print('hard_x distribution:', hard_x_dist) # 2,320
+                print('hard_x distribution accum:', self.hard_x_dist_accum) # 2,320
+                print('class_weight * rescale_factor:', class_weight * rescale_factor)
+                print('hard_x[:10]:', torch.argmax(hard_x, dim=-1)[:10])
+                print('sample_weight[:10]:', sample_weight[:10])
+                print('sample_weight.min():', sample_weight.min())
+                print('sample_weight.max():', sample_weight.max())
+                print('sample_weight.mean():', sample_weight.mean())
+                print('rescale_factor:', rescale_factor)
+                print('temperature:', temperature)
+                print('self.training:', self.training)
         else:
             # No balance (in this case set the diversity loss (loss_weights[1])=10)
             sample_weight = torch.ones(1).to(logits.device).to(logits.dtype)
